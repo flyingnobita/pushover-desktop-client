@@ -41,7 +41,7 @@ class Settings:
             data_dir=Path(env.get("DATA_DIR", "data")),
             admin_password=password,
             auth_disabled=auth_disabled,
-            collector_backend=env.get("COLLECTOR_BACKEND", "stub").strip().lower(),
+            collector_backend=env.get("COLLECTOR_BACKEND", "pushover").strip().lower(),
             collector_interval=float(env.get("COLLECTOR_INTERVAL", "30")),
             page_size=int(env.get("PAGE_SIZE", "50")),
         )

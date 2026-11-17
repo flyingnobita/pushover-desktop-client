@@ -321,3 +321,30 @@ def test_delete_all_requires_csrf(settings: Settings) -> None:
 
     assert response.status_code == 400
     assert "Deploy finished" in still_there.text
+
+
+def test_collector_backend_defaults_to_pushover(monkeypatch) -> None:
+    monkeypatch.delenv("COLLECTOR_BACKEND", raising=False)
+
+    settings = Settings.from_env({"ADMIN_PASSWORD": "secret"})
+
+    assert settings.collector_backend == "pushover"
+
+
+def test_detail_never_links_a_script_url(settings: Settings) -> None:
+    settings = Settings(
+        data_dir=settings.data_dir,
+        admin_password="secret",
+        auth_disabled=False,
+        collector_backend="stub",
+    )
+    gateway = StubGateway(
+        [stub_message("scripty", 300, title="Suspicious", url="javascript:alert(1)")]
+    )
+    with TestClient(create_app(settings, gateway=gateway)) as client:
+        login(client)
+        response = client.get("/messages/scripty")
+
+    assert response.status_code == 200
+    assert 'href="javascript:' not in response.text
+    assert "javascript:alert(1)" in response.text

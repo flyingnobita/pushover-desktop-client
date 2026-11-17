@@ -11,8 +11,12 @@
     item.is_archived %}&middot; Archived{% endif %}
   </p>
   <p class="message-body">{{ item.body }}</p>
-  {% if item.url %}
-  <p><a href="{{ item.url }}" rel="noreferrer noopener">{{ item.url_title or item.url }}</a></p>
+  {% if item.url %} {% set safe_url = item.url | external_url %}
+  <p>
+    {% if safe_url %}<a href="{{ safe_url }}" rel="noreferrer noopener"
+      >{{ item.url_title or item.url }}</a
+    >{% else %}<span class="message-url">{{ item.url }}</span>{% endif %}
+  </p>
   {% endif %}
 </article>
 

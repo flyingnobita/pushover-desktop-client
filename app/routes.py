@@ -9,7 +9,7 @@ import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -30,6 +30,20 @@ COOKIE_NAME = "pdc_session"
 SCOPES = {"inbox", "archived", "all"}
 READ_FILTERS = {"read", "unread"}
 REFRESH_SECONDS = 30
+
+
+def external_url(value: str | None) -> str | None:
+    """Only http(s) URLs may become links; anything else stays plain text."""
+    if not value:
+        return None
+    candidate = value.strip()
+    try:
+        parts = urlsplit(candidate)
+    except ValueError:
+        return None
+    if parts.scheme.lower() in {"http", "https"} and parts.netloc:
+        return candidate
+    return None
 
 
 def utc_text(timestamp: int | None) -> str:
@@ -75,6 +89,7 @@ def create_router(settings: Settings) -> APIRouter:
     signer = SessionSigner(settings.session_key_path)
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.filters["utc"] = utc_text
+    templates.env.filters["external_url"] = external_url
 
     def session_of(request: Request) -> dict[str, Any]:
         existing = signer.load(request.cookies.get(COOKIE_NAME))
