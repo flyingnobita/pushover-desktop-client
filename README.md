@@ -110,4 +110,6 @@ Offscreen browser QA (headless Chromium, disposable data directory):
 )
 ```
 
-`tests/test_ui.py` skips without `QA_BASE_URL` and fails rather than skipping when it is set.
+The browser flow lives in `qa/flow.py`: a plain Playwright script, not a pytest module. The QA
+container runs it with `python qa/flow.py`, prints one line per checked behaviour, and exits
+nonzero on the first failure.

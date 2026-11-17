@@ -33,7 +33,7 @@ services:
       QA_BASE_URL: http://localhost:8080
       QA_ADMIN_PASSWORD: ${QA_ADMIN_PASSWORD:-qa-only}
     volumes:
-      - ./tests/test_ui.py:/qa/tests/test_ui.py:ro
+      - ./qa/flow.py:/qa/flow.py:ro
     # Share the app's network namespace: Chromium treats localhost as trustworthy and
     # does not force an HTTPS upgrade on this LAN-only HTTP service.
     network_mode: "service:app"
