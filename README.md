@@ -62,6 +62,9 @@ configuration are written under `/data`, with owner-only permissions.
 - Back up the whole `/data` directory: the database, the session key and the Pushover session.
   The container runs as uid 10001 and some files are owner-only, so copy the directory as root
   (for example `sudo tar -C "$DATA_DIR" -czf history-backup.tgz .`).
+- Removing the bind-mounted directory needs root for the same reason: files under `/data` belong
+  to uid 10001. Stop the container first, then `sudo rm -rf "$DATA_DIR"`. A permission-denied
+  `rm` means ownership, not corruption.
 - Permanent deletion and Delete all history remove notifications from this client's active
   history only. Older backup copies are not touched and expire under your backup policy.
 - Deleted notifications cannot be restored, and late redelivery from Pushover cannot bring them
