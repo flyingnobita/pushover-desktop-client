@@ -16,14 +16,14 @@ Status: Interview decisions settled; awaiting confirmation of the complete desig
 - New notifications enter Inbox; Archive moves them to Archived; Restore returns them to Inbox. Delete permanently removes them from either view without a Trash view.
 - Archive all moves Inbox notifications to Archived. Delete all history requires explicit confirmation, shows the affected count and permanently removes both Inbox and Archived history.
 - Opening a notification marks it read. Archive and Restore preserve read status. There is no automatic expiry of stored history or attachments.
-- First fleet deployment target: ThinkPad, alongside Healthchecks.
+- First fleet deployment target: the fleet host, alongside Healthchecks.
 - Configure through the private GUI; discard the Pushover password after successful authentication and retain the receiving session credentials. Support Pushover 2FA.
 - Retry collection automatically during outages, keeping saved history available. Save content before confirming receipt. Never automatically acknowledge emergency alerts.
 - One application container with SQLite; keep persistent state in one mounted directory. No attachment download worker or attachment storage in the first version.
-- Join ThinkPad's existing backup routine. Permanent deletion removes active history, not older backup copies; those expire under the backup policy.
+- Join the fleet host's existing backup routine. Permanent deletion removes active history, not older backup copies; those expire under the backup policy.
 - Emergency notifications use the ordinary list and detail views with a distinct indicator, such as an exclamation icon and light red background.
 - No emergency acknowledgement control; use the existing Pushover app for acknowledgement.
-- Reuse ThinkPad's existing private HTTPS routing and certificates for LAN and Tailscale access. Do not create a tunnel or public route.
+- Reuse the fleet host's existing private HTTPS routing and certificates for LAN and Tailscale access. Do not create a tunnel or public route.
 - Responsive phone and desktop interface with automatic updates that preserve selected filters. Search across an explicit Inbox/Archived/All scope.
 - Implementation stack selection is delegated: use a small maintained backend and server-rendered interface, without a separate frontend application.
 
