@@ -1,11 +1,23 @@
-# Notification History
+# Pushover Desktop Client
 
-A personal history of notifications received by a dedicated Pushover device.
+Notification history for a dedicated Pushover device.
 
 It registers this client as an Open Client device on your Pushover account, stores every
 notification it receives in SQLite, and serves a server-rendered web interface for reading,
 searching, archiving and deleting that history. Read status, Inbox/Archived membership and
 deletion are local to this client.
+
+[MIT licensed](LICENSE). Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public
+issue.
+
+## Screenshots
+
+![The Inbox listing three demo notifications produced by the stub backend](docs/screenshots/history-list.png)
+
+![The detail view of the demo "Disk health warning" notification from the stub backend](docs/screenshots/history-detail.png)
+
+Both images show the stub backend's demo messages, not real notifications. They are regenerated
+from that same stub data with the script in [Development](#development).
 
 ## What it does
 
@@ -20,6 +32,9 @@ deletion are local to this client.
 
 ## Quick start
 
+Today you build the image from source. A published container image is coming; until it exists,
+this is the only install path.
+
 ```bash
 ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
 ```
@@ -31,6 +46,15 @@ client is registered as a dedicated device and starts collecting.
 
 The only persistent path is `/data` (bind-mounted from `${DATA_DIR:-./data}`). It holds the
 SQLite database, the session-signing key and the Pushover receiving session.
+
+### Try it without Pushover
+
+```bash
+COLLECTOR_BACKEND=stub ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
+```
+
+The stub backend fills the history with deterministic demo messages, so you can read the
+interface before touching a Pushover account. Nothing leaves the machine.
 
 ## Environment variables
 
@@ -56,6 +80,9 @@ and permanently delete your notification history. Only do this on a network you 
 Pushover passwords and two-factor codes are used only for the request that submits them. They
 are never logged and never stored. Only the receiving session secret, device ID and non-secret
 configuration are written under `/data`, with owner-only permissions.
+
+To report a vulnerability, use GitHub private vulnerability reporting as described in
+[SECURITY.md](SECURITY.md).
 
 ## Backups and deletion
 
@@ -116,3 +143,27 @@ Offscreen browser QA (headless Chromium, disposable data directory):
 The browser flow lives in `qa/flow.py`: a plain Playwright script, not a pytest module. The QA
 container runs it with `python qa/flow.py`, prints one line per checked behaviour, and exits
 nonzero on the first failure.
+
+Regenerate the screenshots above (same stub data, isolated Compose project, always torn down):
+
+```bash
+(
+  set -euo pipefail
+  export COMPOSE_FILE="compose.yaml:compose.qa.yaml"
+  trap 'docker compose -p pdc7-shots down --volumes --remove-orphans' EXIT
+  mkdir -p docs/screenshots
+  docker compose -p pdc7-shots up --build -d app
+  docker compose -p pdc7-shots run --rm qa python /qa/screenshots.py
+)
+```
+
+`qa/screenshots.py` logs in, captures the Inbox list and the "Disk health warning" detail page at
+1280x800, and writes `docs/screenshots/history-list.png` and `docs/screenshots/history-detail.png`.
+Because the container writes as root, `sudo chown "$(id -u):$(id -g)" docs/screenshots/*.png`
+afterwards keeps the files yours.
+
+## Reporting issues
+
+- Bugs and feature requests: open an issue on this repository's Issues tab.
+- Vulnerabilities: do not open a public issue. Use GitHub private vulnerability reporting, as
+  described in [SECURITY.md](SECURITY.md).

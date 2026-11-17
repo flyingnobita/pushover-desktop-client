@@ -4,7 +4,7 @@ Status: Interview decisions settled; awaiting confirmation of the complete desig
 
 ## Settled requirements
 
-- Standalone application at `/home/omarchy/Data/Projects/Personal/pushover-desktop-client`; fleet Compose deployment belongs in the dotfiles repository.
+- Standalone application at the project repository; fleet Compose deployment belongs in the dotfiles repository.
 - Run through Docker Compose for one personal Pushover account.
 - Receive notifications as a dedicated Open Client device, avoiding per-source configuration.
 - Read/unread status is local to this application and separate from emergency acknowledgement.
