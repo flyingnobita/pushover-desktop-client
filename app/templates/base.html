@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Notification History{% endblock %}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">Notification History</a>
+      {% if auth_enabled %}
+      <form method="post" action="/logout" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="link">Log out</button>
+      </form>
+      {% endif %}
+    </header>
+    {% if not auth_enabled %}
+    <p class="warning">
+      Access control is disabled. Anyone who can reach this service can read and permanently
+      delete your notification history.
+    </p>
+    {% endif %}
+    <main>{% block content %}{% endblock %}</main>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Inbox{% endblock %}
+{% block content %}
+<section class="status" aria-live="polite">
+  <p>{{ receiver.text }}</p>
+</section>
+<h1>Inbox</h1>
+<p class="empty">No notifications yet.</p>
+{% endblock %}
