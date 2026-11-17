@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Delete all history{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Delete all history</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <p>
+    This permanently deletes <strong>{{ expected_count }}</strong> notification(s) from Inbox and
+    Archived. There is no Trash, and deleted notifications cannot be restored.
+  </p>
+  <form method="post" action="/history/delete-all">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="expected_count" value="{{ expected_count }}" />
+    <input type="hidden" name="next" value="{{ back_url }}" />
+    <button type="submit" class="danger">
+      Delete {{ expected_count }} notification(s) permanently
+    </button>
+  </form>
+  <p><a href="{{ back_url }}">Cancel</a></p>
+</section>
+{% endblock %}

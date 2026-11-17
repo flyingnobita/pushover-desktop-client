@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.collector import StubGateway
+from app.collector import StubGateway, collect_once
 from app.config import Settings
 from app.main import create_app
 from tests.conftest import csrf_token, login
@@ -227,3 +227,97 @@ def test_second_pass_after_archive_keeps_other_items_in_order(settings: Settings
     assert inbox.text.index("Deploy finished") < inbox.text.index("Old news")
     assert "Hello there" in archived.text
     assert "Deploy finished" not in archived.text
+
+
+def test_selected_archive_restore_and_delete(settings: Settings) -> None:
+    with reader(settings) as client:
+        token = csrf_token(client.get("/").text)
+        client.post(
+            "/messages/archive",
+            data={"csrf_token": token, "ids": "chat", "next": "/?scope=inbox"},
+        )
+        inbox_after_archive = client.get("/", params={"scope": "inbox"})
+        archived_after_archive = client.get("/", params={"scope": "archived"})
+        client.post(
+            "/messages/restore",
+            data={"csrf_token": token, "ids": "chat", "next": "/?scope=inbox"},
+        )
+        restored = client.get("/", params={"scope": "inbox"})
+        client.post("/messages/delete", data={"csrf_token": token, "ids": "deploy", "next": "/"})
+        everything = client.get("/", params={"scope": "all"})
+
+    assert "Hello there" not in inbox_after_archive.text
+    assert "Hello there" in archived_after_archive.text
+    assert "Hello there" in restored.text
+    assert "Deploy finished" not in everything.text
+    assert "Hello there" in everything.text
+
+
+def test_archive_all_applies_to_the_whole_inbox_not_only_the_visible_page(
+    settings: Settings,
+) -> None:
+    with reader(settings) as client:
+        first_page = client.get("/", params={"scope": "inbox", "limit": 1})
+        token = csrf_token(first_page.text)
+        client.post(
+            "/messages/archive-all",
+            data={"csrf_token": token, "next": "/?scope=inbox"},
+        )
+        inbox = client.get("/", params={"scope": "inbox"})
+        archived = client.get("/", params={"scope": "archived"})
+
+    assert "No notifications yet." in inbox.text
+    for title in ["Deploy finished", "Hello there", "Old news"]:
+        assert title in archived.text
+
+
+def test_delete_all_shows_the_count_and_aborts_on_drift(settings: Settings) -> None:
+    settings = Settings(
+        data_dir=settings.data_dir,
+        admin_password="secret",
+        auth_disabled=False,
+        collector_backend="stub",
+    )
+    gateway = StubGateway(
+        [
+            stub_message("deploy", 300, title="Deploy finished"),
+            stub_message("chat", 200, title="Hello there"),
+            stub_message("old", 100, title="Old news"),
+        ]
+    )
+    with TestClient(create_app(settings, gateway=gateway)) as client:
+        login(client)
+        confirmation = client.get("/history/delete-all")
+        token = csrf_token(confirmation.text)
+
+        gateway.pending.append(stub_message("fresh", 400, title="Fresh arrival"))
+        collect_once(gateway, client.app.state.storage)
+
+        drift = client.post(
+            "/history/delete-all",
+            data={"csrf_token": token, "expected_count": "3", "next": "/"},
+        )
+        still_there = client.get("/", params={"scope": "all"})
+        retry_token = csrf_token(drift.text)
+        deleted = client.post(
+            "/history/delete-all",
+            data={"csrf_token": retry_token, "expected_count": "4", "next": "/"},
+            follow_redirects=False,
+        )
+        after = client.get("/", params={"scope": "all"})
+
+    assert "<strong>3</strong>" in confirmation.text
+    assert "Fresh arrival" not in confirmation.text
+    assert drift.status_code == 409
+    assert "Fresh arrival" in still_there.text
+    assert deleted.status_code == 303
+    assert "No notifications yet." in after.text
+
+
+def test_delete_all_requires_csrf(settings: Settings) -> None:
+    with reader(settings) as client:
+        response = client.post("/history/delete-all", data={"expected_count": "3", "next": "/"})
+        still_there = client.get("/", params={"scope": "all"})
+
+    assert response.status_code == 400
+    assert "Deploy finished" in still_there.text

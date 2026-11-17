@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.storage import Storage
+import pytest
+
+from app.storage import CountChanged, Storage
 from tests.conftest import notification
 
 
@@ -131,3 +133,74 @@ def test_read_state_is_durable_and_reversible(storage: Storage) -> None:
     assert storage.set_read(["a"], False) == 1
     assert [item.pushover_message_id for item in storage.list_page(read="unread").items] == ["a"]
     assert storage.get("b").is_read is True
+
+
+def test_selected_archive_and_restore_preserve_read_status(storage: Storage) -> None:
+    storage.persist_delivery(notification("a", 100))
+    storage.persist_delivery(notification("b", 200))
+    storage.set_read(["a", "b"], True)
+
+    assert storage.archive(["a"]) == 1
+    assert [item.pushover_message_id for item in storage.list_page(scope="archived").items] == ["a"]
+    assert storage.get("a").is_read is True
+
+    assert storage.restore(["a"]) == 1
+    assert [item.pushover_message_id for item in storage.list_page(scope="inbox").items] == [
+        "b",
+        "a",
+    ]
+    assert storage.get("a").is_read is True
+    assert storage.get("b").is_read is True
+
+
+def test_archive_all_moves_every_inbox_item_and_keeps_later_arrivals_in_inbox(
+    storage: Storage,
+) -> None:
+    for message_id in ["a", "b", "c"]:
+        storage.persist_delivery(notification(message_id, 100))
+    storage.archive(["c"])
+
+    assert storage.archive_all() == 2
+    assert storage.counts() == {"inbox": 0, "archived": 3, "all": 3}
+
+    storage.persist_delivery(notification("d", 300))
+
+    assert [item.pushover_message_id for item in storage.list_page(scope="inbox").items] == ["d"]
+    assert [item.pushover_message_id for item in storage.list_page(scope="archived").items] == [
+        "c",
+        "b",
+        "a",
+    ]
+
+
+def test_selected_delete_removes_content_but_keeps_the_receipt(storage: Storage) -> None:
+    storage.persist_delivery(notification("a", 100))
+    storage.persist_delivery(notification("b", 200))
+
+    assert storage.delete(["a"]) == 1
+
+    assert storage.get("a") is None
+    assert storage.get("b") is not None
+    receipt = storage.receipt("a")
+    assert receipt is not None
+    assert storage.persist_delivery(notification("a", 100, title="Resurrected")) == "tombstoned"
+    assert storage.get("a") is None
+    assert storage.counts() == {"inbox": 1, "archived": 0, "all": 1}
+
+
+def test_delete_all_aborts_on_count_drift_and_keeps_all_history(storage: Storage) -> None:
+    storage.persist_delivery(notification("a", 100))
+    storage.persist_delivery(notification("b", 200))
+    storage.persist_delivery(notification("c", 300))
+
+    with pytest.raises(CountChanged) as error:
+        storage.delete_all(expected_count=2)
+
+    assert (error.value.expected, error.value.actual) == (2, 3)
+    assert storage.counts() == {"inbox": 3, "archived": 0, "all": 3}
+
+    assert storage.delete_all(expected_count=3) == 3
+
+    assert storage.counts() == {"inbox": 0, "archived": 0, "all": 0}
+    assert storage.receipt("a") is not None
+    assert storage.receipt("b") is not None
