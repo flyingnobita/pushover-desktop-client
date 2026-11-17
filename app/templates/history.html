@@ -70,6 +70,7 @@
         local_time }}{% if item.priority == 2 %} &middot; Emergency{% elif item.priority == 1 %} &middot;
         High priority{% endif %}{% if not item.is_read %} &middot; Unread{% endif %}
       </span>
+      {% if filters.scope == "all" and item.is_archived %}<span class="badge">Archived</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

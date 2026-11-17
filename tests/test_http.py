@@ -378,3 +378,29 @@ def test_header_offers_theme_choice(settings: Settings) -> None:
     assert inline, response.text
     assert 'localStorage.getItem("theme")' in inline.group(1)
     assert response.text.index("localStorage.getItem") < response.text.index('rel="stylesheet"')
+
+
+def test_all_scope_marks_archived_rows(settings: Settings) -> None:
+    settings = Settings(
+        data_dir=settings.data_dir,
+        admin_password="secret",
+        auth_disabled=False,
+        collector_backend="stub",
+    )
+    gateway = StubGateway(
+        [
+            stub_message("deploy", 300, title="Deploy finished"),
+            stub_message("old", 100, title="Old news"),
+        ]
+    )
+    with TestClient(create_app(settings, gateway=gateway)) as client:
+        login(client)
+        token = csrf_token(client.get("/").text)
+        client.post("/messages/archive", data={"csrf_token": token, "ids": "old", "next": "/"})
+        response = client.get("/", params={"scope": "all"})
+
+    rows = re.findall(r'<li\b[^>]*class="message[^"]*"[^>]*>(.*?)</li>', response.text, re.DOTALL)
+    archived_row = next(row for row in rows if "Old news" in row)
+    inbox_row = next(row for row in rows if "Deploy finished" in row)
+    assert "Archived" in archived_row
+    assert "Archived" not in inbox_row
