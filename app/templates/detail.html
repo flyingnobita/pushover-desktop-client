@@ -6,7 +6,7 @@
   <h1>{{ item.title }}</h1>
   <p class="message-meta">
     {{ item.source_app }}{% if item.source_app %} &middot; {% endif %}{{ item.message_timestamp |
-    utc }} {% if item.priority == 2 %}&middot; Emergency{% elif item.priority == 1 %}&middot; High
+    local_time }} {% if item.priority == 2 %}&middot; Emergency{% elif item.priority == 1 %}&middot; High
     priority{% endif %} {% if item.is_read %}&middot; Read{% else %}&middot; Unread{% endif %} {% if
     item.is_archived %}&middot; Archived{% endif %}
   </p>

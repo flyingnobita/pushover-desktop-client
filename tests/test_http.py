@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -348,3 +349,20 @@ def test_detail_never_links_a_script_url(settings: Settings) -> None:
     assert response.status_code == 200
     assert 'href="javascript:' not in response.text
     assert "javascript:alert(1)" in response.text
+
+
+def test_list_renders_local_time_elements_and_the_script(settings: Settings) -> None:
+    with reader(settings) as client:
+        response = client.get("/")
+
+    match = re.search(r'<time datetime="([^"]+)" data-local-time>', response.text)
+    assert match, response.text
+    datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%SZ")
+    assert 'src="/static/local-time.js"' in response.text
+
+
+def test_authenticated_list_is_not_cached(settings: Settings) -> None:
+    with reader(settings) as client:
+        response = client.get("/")
+
+    assert "no-store" in response.headers.get("cache-control", "")

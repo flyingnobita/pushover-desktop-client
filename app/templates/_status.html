@@ -1,0 +1,15 @@
+<section class="status" aria-live="polite">
+  <p>
+    {%- if receiver.kind == "not_connected" -%}
+    Pushover receiver: not connected. Sign in from Pushover setup.
+    {%- elif receiver.kind == "connected_not_run" -%}
+    Pushover receiver: connected, collection has not run yet.
+    {%- elif receiver.kind == "never" -%}
+    Collection has not run yet.
+    {%- elif receiver.kind == "ok" -%}
+    {{ receiver.backend }} receiver: last successful sync {{ receiver.local_success }}
+    {%- else -%}
+    {{ receiver.backend }} receiver error: {{ receiver.error }}. Last successful sync {{ receiver.local_success }}
+    {%- endif -%}
+  </p>
+</section>

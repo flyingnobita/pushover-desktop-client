@@ -4,9 +4,7 @@
 <meta http-equiv="refresh" content="{{ refresh_seconds }};url={{ refresh_url }}" />
 {% endblock %}
 {% block content %}
-<section class="status" aria-live="polite">
-  <p>{{ receiver.text }}</p>
-</section>
+{% include "_status.html" %}
 
 <nav class="scopes">
   {% for name in ["inbox", "archived", "all"] %}
@@ -69,7 +67,7 @@
       >
       <span class="message-meta">
         {{ item.source_app }}{% if item.source_app %} &middot; {% endif %}{{ item.message_timestamp |
-        utc }}{% if item.priority == 2 %} &middot; Emergency{% elif item.priority == 1 %} &middot;
+        local_time }}{% if item.priority == 2 %} &middot; Emergency{% elif item.priority == 1 %} &middot;
         High priority{% endif %}{% if not item.is_read %} &middot; Unread{% endif %}
       </span>
     </li>

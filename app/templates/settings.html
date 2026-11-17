@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Pushover setup{% endblock %}
 {% block content %}
-<section class="status" aria-live="polite">
-  <p>{{ receiver.text }}</p>
-</section>
+{% include "_status.html" %}
 
 <h1>Pushover setup</h1>
 
@@ -19,7 +17,7 @@
   <h2>Connected</h2>
   <p>Account: {{ connection.email }}</p>
   <p>Device: {{ connection.device_name }} ({{ connection.device_id }})</p>
-  <p>Last successful sync: {{ receiver.last_success }}</p>
+  <p>Last successful sync: {{ receiver.local_success }}</p>
   <p class="muted">
     Emergency notifications are displayed but never acknowledged by this client. Acknowledge them
     in the Pushover app.

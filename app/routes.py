@@ -14,6 +14,7 @@ from urllib.parse import urlencode, urlsplit
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from app.config import Settings
 from app.pushover import (
@@ -46,10 +47,14 @@ def external_url(value: str | None) -> str | None:
     return None
 
 
-def utc_text(timestamp: int | None) -> str:
+def local_time(timestamp: int | None) -> Markup:
+    """UTC as the no-JS fallback; the static script rewrites it to local time."""
     if not timestamp:
-        return "never"
-    return datetime.fromtimestamp(timestamp, tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+        return Markup("never")
+    moment = datetime.fromtimestamp(timestamp, tz=UTC)
+    iso = moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    fallback = moment.strftime("%Y-%m-%d %H:%M UTC")
+    return Markup(f'<time datetime="{iso}" data-local-time>{fallback}</time>')
 
 
 class SessionSigner:
@@ -88,7 +93,7 @@ def create_router(settings: Settings) -> APIRouter:
     router = APIRouter()
     signer = SessionSigner(settings.session_key_path)
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
-    templates.env.filters["utc"] = utc_text
+    templates.env.filters["local_time"] = local_time
     templates.env.filters["external_url"] = external_url
 
     def session_of(request: Request) -> dict[str, Any]:
@@ -118,6 +123,8 @@ def create_router(settings: Settings) -> APIRouter:
         context.setdefault("auth_enabled", not settings.auth_disabled)
         context.setdefault("signed_in", bool(session.get("auth")) or settings.auth_disabled)
         result = templates.TemplateResponse(request, template, context, status_code=status_code)
+        # Authenticated HTML must re-fetch after Back so read state is never stale.
+        result.headers["Cache-Control"] = "no-store"
         result.set_cookie(
             COOKIE_NAME,
             signer.dump(session),
@@ -156,26 +163,19 @@ def create_router(settings: Settings) -> APIRouter:
             settings.collector_backend != "pushover" or pushover_session(request) is not None
         )
         if not connected:
-            text = "Pushover receiver: not connected. Sign in from Pushover setup."
+            kind = "not_connected"
         elif state.status == "never":
-            if settings.collector_backend == "pushover":
-                text = "Pushover receiver: connected, collection has not run yet."
-            else:
-                text = "Collection has not run yet."
+            kind = "connected_not_run" if settings.collector_backend == "pushover" else "never"
         elif state.status == "ok":
-            text = f"{backend} receiver: last successful sync {utc_text(state.last_success_at)}."
+            kind = "ok"
         else:
-            text = (
-                f"{backend} receiver error: {state.last_error}."
-                f" Last successful sync {utc_text(state.last_success_at)}."
-            )
+            kind = "error"
         return {
             "backend": backend,
-            "text": text,
-            "status": state.status,
+            "kind": kind,
             "connected": connected,
-            "last_success": utc_text(state.last_success_at),
-            "last_attempt": utc_text(state.last_attempt_at),
+            "error": state.last_error,
+            "local_success": local_time(state.last_success_at),
         }
 
     def list_url(request: Request, cursor: str | None = None) -> str:
