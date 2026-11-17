@@ -150,10 +150,10 @@ Regenerate the screenshots above (same stub data, isolated Compose project, alwa
 (
   set -euo pipefail
   export COMPOSE_FILE="compose.yaml:compose.qa.yaml"
-  trap 'docker compose -p pdc7-shots down --volumes --remove-orphans' EXIT
+  trap 'docker compose -p screenshots down --volumes --remove-orphans' EXIT
   mkdir -p docs/screenshots
-  docker compose -p pdc7-shots up --build -d app
-  docker compose -p pdc7-shots run --rm qa python /qa/screenshots.py
+  docker compose -p screenshots up --build -d app
+  docker compose -p screenshots run --rm qa python /qa/screenshots.py
 )
 ```
 
