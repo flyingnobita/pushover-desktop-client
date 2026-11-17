@@ -32,12 +32,12 @@ from that same stub data with the script in [Development](#development).
 
 ## Quick start
 
-Today you build the image from source. A published container image is coming; until it exists,
-this is the only install path.
-
 ```bash
-ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
+IMAGE_TAG=0.1.0 docker compose pull app
+ADMIN_PASSWORD='choose-a-strong-password' IMAGE_TAG=0.1.0 docker compose up -d
 ```
+
+Pin `IMAGE_TAG` to the version you tested; `latest` follows releases.
 
 Open <http://127.0.0.1:8080>, log in with the password you just set, then open
 **Pushover setup** and sign in with your Pushover email and password. If your account uses
@@ -50,17 +50,35 @@ SQLite database, the session-signing key and the Pushover receiving session.
 ### Try it without Pushover
 
 ```bash
-COLLECTOR_BACKEND=stub ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
+IMAGE_TAG=0.1.0 docker compose pull app
+COLLECTOR_BACKEND=stub ADMIN_PASSWORD='choose-a-strong-password' IMAGE_TAG=0.1.0 docker compose up -d
 ```
 
 The stub backend fills the history with deterministic demo messages, so you can read the
 interface before touching a Pushover account. Nothing leaves the machine.
+
+### Container image
+
+- Registry: `ghcr.io/flyingnobita/pushover-desktop-client`.
+- Tags: `0.1.0` (exact release), `0.1` (series), `latest` (newest release), `sha-<12>` (the
+  tagged commit).
+- Platforms: `linux/amd64` and `linux/arm64`.
+- Provenance and SBOM attestations are attached to the image.
+- Pulls are anonymous: no `docker login` and no token needed.
+- `latest` is written only by the release workflow. A local `docker compose up --build` builds
+  and shadows the same name on your machine and never pushes it.
+- Tags are derived from the pushed git tag and the tagged commit; CI asserts all four tags
+  resolve to one digest.
+- Image data lives at `/data` in the container, written by uid 10001, and the web port is 8080
+  on `${BIND_ADDRESS:-127.0.0.1}`. See [Backups and deletion](#backups-and-deletion) for the
+  root-owned paths.
 
 ## Environment variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `DATA_DIR` | `./data` (host bind) / `/data` (container) | Host directory mounted as `/data` inside the container. |
+| `IMAGE_TAG` | `latest` | Image tag `docker compose pull` and `up` use, for example `0.1.0`. |
 | `BIND_ADDRESS` | `127.0.0.1` | Host address the web port is published on. |
 | `ADMIN_PASSWORD` | none | Administrator password. Required unless `AUTH_DISABLED=true`. |
 | `AUTH_DISABLED` | `false` | `true` disables the login screen entirely. |
@@ -111,6 +129,12 @@ To report a vulnerability, use GitHub private vulnerability reporting as describ
   validation is part of this repository's checks.
 
 ## Development
+
+Build the image from source:
+
+```bash
+ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
+```
 
 ```bash
 python3 -m venv .venv
