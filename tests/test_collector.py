@@ -216,9 +216,7 @@ def test_full_disk_recording_fault_never_escapes_the_pass(storage: Storage) -> N
     gateway = StubGateway([message("a", 100)])
 
     try:
-        result = collect_once(
-            gateway, RecordingFaults(storage, "mark_confirmed", "record_failure")
-        )
+        result = collect_once(gateway, RecordingFaults(storage, "mark_confirmed", "record_failure"))
     except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
         pytest.fail(f"collect_once raised on a recording fault: {error!r}")
 

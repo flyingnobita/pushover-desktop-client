@@ -80,7 +80,7 @@ def default_stub_messages() -> list[dict[str, Any]]:
             "id": "1700000100",
             "date": 1_700_000_100,
             "title": "Disk health warning",
-            "message": "ThinkPad disk reports a failing sector.",
+            "message": "The system disk reports a failing sector.",
             "app": "Monitor",
             "priority": 2,
         },
