@@ -141,6 +141,9 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
                     received += 1
                 else:
                     duplicates += 1
+                # Already persisted and confirmed upstream; a receipt fault is
+                # still recorded instead of ending the retry loop.
+                storage.mark_confirmed(notification.pushover_message_id, int(time.time()))
         except Exception as error:  # noqa: BLE001 - surface the fault, confirm nothing
             storage.record_failure(f"delivery failed: {error}")
             return CollectResult(
@@ -150,8 +153,6 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
                 confirmed=confirmed,
                 error=f"delivery failed: {error}",
             )
-        if notification is not None:
-            storage.mark_confirmed(notification.pushover_message_id, int(time.time()))
 
     if skipped:
         error = f"skipped {len(skipped)} malformed message(s): {skipped[-1]}"

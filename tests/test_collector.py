@@ -165,3 +165,30 @@ def test_confirm_failure_leaves_the_message_persisted_for_redelivery(
 
     assert collect_once(retry, storage).duplicates == 1
     assert retry.confirmed == ["a"]
+
+
+def test_mark_confirmed_failure_is_recorded_and_never_escapes(storage: Storage) -> None:
+    class MarkConfirmedFails:
+        """Real storage whose receipt write fails, like a full disk."""
+
+        def mark_confirmed(self, message_id: str, confirmed_at: int) -> None:
+            raise RuntimeError("disk full")
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(storage, name)
+
+    gateway = StubGateway([message("a", 100)])
+
+    try:
+        result = collect_once(gateway, MarkConfirmedFails())
+    except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
+        pytest.fail(f"collect_once raised instead of recording the fault: {error!r}")
+
+    assert result.ok is False
+    assert "disk full" in (result.error or "")
+    assert storage.sync_state().status == "error"
+    assert "disk full" in (storage.sync_state().last_error or "")
+    # Persist-before-confirm is unchanged: the message and its queue confirmation
+    # already happened before the receipt write failed.
+    assert storage.get("a") is not None
+    assert gateway.confirmed == ["a"]
