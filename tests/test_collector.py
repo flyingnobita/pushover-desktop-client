@@ -115,7 +115,7 @@ def test_fetch_failure_records_error_and_keeps_history(storage: Storage) -> None
         {"date": 100},
     ],
 )
-def test_malformed_message_is_rejected_without_confirmation(
+def test_malformed_message_is_skipped_and_never_persisted(
     storage: Storage, payload: Mapping[str, Any]
 ) -> None:
     gateway = StubGateway([payload])
@@ -123,7 +123,27 @@ def test_malformed_message_is_rejected_without_confirmation(
     result = collect_once(gateway, storage)
 
     assert result.ok is False
-    assert gateway.confirmed == []
+    # A well-formed id is confirmed so it leaves the queue; an unusable id is not.
+    expected = ["a"] if payload.get("id") == "a" else []
+    assert gateway.confirmed == expected
+    assert storage.counts()["all"] == 0
+    assert storage.sync_state().status == "error"
+
+
+def test_malformed_message_is_skipped_and_later_messages_are_persisted(
+    storage: Storage,
+) -> None:
+    gateway = StubGateway([message("bad", 100, priority=9), message("good", 200)])
+
+    try:
+        collect_once(gateway, storage)
+    except Exception as error:  # noqa: BLE001 - pre-fix the malformed message aborts the pass
+        pytest.fail(f"collect_once raised instead of skipping: {error!r}")
+
+    assert storage.get("good") is not None
+    assert storage.get("bad") is None
+    assert gateway.confirmed == ["bad", "good"]
+    assert gateway.pending == []
     assert storage.sync_state().status == "error"
 
 

@@ -106,7 +106,11 @@ class StubGateway:
 
 
 def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
-    """Run one collection pass; never confirms a message it failed to persist."""
+    """Run one collection pass; never confirms a message it failed to persist.
+
+    A malformed message is skipped and its id confirmed so it cannot block the
+    pass, but the failure is recorded; a storage fault still aborts unconfirmed.
+    """
     try:
         messages = gateway.fetch_messages()
     except Exception as error:  # noqa: BLE001 - any fetch fault is a recorded outage
@@ -114,11 +118,29 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
         return CollectResult(ok=False, error=f"fetch failed: {error}")
 
     received = duplicates = confirmed = 0
+    skipped: list[str] = []
     for message in messages:
         try:
             notification = map_message(message)
-            outcome = storage.persist_delivery(notification)
-            gateway.confirm([notification.pushover_message_id])
+        except ValueError as error:
+            # Skip it, but still confirm a well-formed id so the upstream queue
+            # drains instead of replaying the same message every pass.
+            skipped.append(str(error))
+            notification = None
+        try:
+            if notification is None:
+                message_id = str(message.get("id") or "")
+                if MESSAGE_ID_RE.match(message_id):
+                    gateway.confirm([message_id])
+                    confirmed += 1
+            else:
+                outcome = storage.persist_delivery(notification)
+                gateway.confirm([notification.pushover_message_id])
+                confirmed += 1
+                if outcome == "created":
+                    received += 1
+                else:
+                    duplicates += 1
         except Exception as error:  # noqa: BLE001 - surface the fault, confirm nothing
             storage.record_failure(f"delivery failed: {error}")
             return CollectResult(
@@ -128,12 +150,19 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
                 confirmed=confirmed,
                 error=f"delivery failed: {error}",
             )
-        storage.mark_confirmed(notification.pushover_message_id, int(time.time()))
-        confirmed += 1
-        if outcome == "created":
-            received += 1
-        else:
-            duplicates += 1
+        if notification is not None:
+            storage.mark_confirmed(notification.pushover_message_id, int(time.time()))
+
+    if skipped:
+        error = f"skipped {len(skipped)} malformed message(s): {skipped[-1]}"
+        storage.record_failure(error)
+        return CollectResult(
+            ok=False,
+            received=received,
+            duplicates=duplicates,
+            confirmed=confirmed,
+            error=error,
+        )
 
     storage.record_success()
     return CollectResult(ok=True, received=received, duplicates=duplicates, confirmed=confirmed)
