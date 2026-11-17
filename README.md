@@ -133,7 +133,7 @@ To report a vulnerability, use GitHub private vulnerability reporting as describ
 Build the image from source:
 
 ```bash
-docker compose up --build -d
+ADMIN_PASSWORD='choose-a-strong-password' docker compose up --build -d
 ```
 
 ```bash
