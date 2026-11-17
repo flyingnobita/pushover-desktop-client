@@ -366,3 +366,15 @@ def test_authenticated_list_is_not_cached(settings: Settings) -> None:
         response = client.get("/")
 
     assert "no-store" in response.headers.get("cache-control", "")
+
+
+def test_header_offers_theme_choice(settings: Settings) -> None:
+    with reader(settings) as client:
+        response = client.get("/")
+
+    for choice in ["light", "dark", "system"]:
+        assert f'data-theme-choice="{choice}"' in response.text
+    inline = re.search(r"<script>(.*?)</script>", response.text, re.DOTALL)
+    assert inline, response.text
+    assert 'localStorage.getItem("theme")' in inline.group(1)
+    assert response.text.index("localStorage.getItem") < response.text.index('rel="stylesheet"')

@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #f7f7f5;
   --panel: #ffffff;
   --text: #1d1d1b;
@@ -10,8 +10,10 @@
   --warning: #fff4d6;
 }
 
+/* System dark applies only while no explicit light or dark choice is stored. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #181817;
     --panel: #232322;
     --text: #ecece8;
@@ -21,6 +23,22 @@
     --emergency: #3a1f1f;
     --warning: #3a3220;
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #181817;
+  --panel: #232322;
+  --text: #ecece8;
+  --muted: #a5a5a0;
+  --line: #3a3a38;
+  --accent: #8ab6e8;
+  --emergency: #3a1f1f;
+  --warning: #3a3220;
 }
 
 * {
@@ -248,4 +266,31 @@ button.link {
   border: 1px solid var(--line);
   border-radius: 6px;
   text-decoration: none;
+}
+
+.theme-switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.theme-switch button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.message-url {
+  word-break: break-all;
+  color: var(--muted);
 }

@@ -4,6 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Notification History{% endblock %}</title>
+    <script>
+      (function () {
+        var choice = "system";
+        try {
+          var stored = localStorage.getItem("theme");
+          if (stored === "light" || stored === "dark") {
+            choice = stored;
+          }
+        } catch (error) {
+          choice = "system";
+        }
+        document.documentElement.dataset.theme = choice;
+      })();
+    </script>
     <link rel="stylesheet" href="/static/app.css" />
     <script src="/static/local-time.js" defer></script>
     {% block head %}{% endblock %}
@@ -14,6 +28,11 @@
       {% if signed_in %}
       <a class="nav-link" href="/settings/pushover">Pushover setup</a>
       {% endif %}
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-choice="light">Light</button>
+        <button type="button" data-theme-choice="dark">Dark</button>
+        <button type="button" data-theme-choice="system">System</button>
+      </div>
       {% if auth_enabled and signed_in %}
       <form method="post" action="/logout" class="inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
@@ -28,5 +47,35 @@
     </p>
     {% endif %}
     <main>{% block content %}{% endblock %}</main>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var buttons = document.querySelectorAll("[data-theme-choice]");
+
+        function mark(choice) {
+          buttons.forEach(function (button) {
+            button.setAttribute(
+              "aria-pressed",
+              button.dataset.themeChoice === choice ? "true" : "false"
+            );
+          });
+        }
+
+        buttons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            var choice = button.dataset.themeChoice;
+            root.dataset.theme = choice;
+            try {
+              localStorage.setItem("theme", choice);
+            } catch (error) {
+              /* storage can be unavailable; the choice still applies for this page */
+            }
+            mark(choice);
+          });
+        });
+
+        mark(root.dataset.theme || "system");
+      })();
+    </script>
   </body>
 </html>
