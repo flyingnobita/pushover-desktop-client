@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Pushover setup{% endblock %}
+{% block content %}
+<section class="status" aria-live="polite">
+  <p>{{ receiver.text }}</p>
+</section>
+
+<h1>Pushover setup</h1>
+
+{% if not backend_enabled %}
+<p class="warning">
+  Pushover collection is not enabled for this run because the collector backend is not
+  <code>pushover</code>. Sign-in is disabled here.
+</p>
+{% endif %}
+
+{% if connection %}
+<section class="card">
+  <h2>Connected</h2>
+  <p>Account: {{ connection.email }}</p>
+  <p>Device: {{ connection.device_name }} ({{ connection.device_id }})</p>
+  <p>Last successful sync: {{ receiver.last_success }}</p>
+  <p class="muted">
+    Emergency notifications are displayed but never acknowledged by this client. Acknowledge them
+    in the Pushover app.
+  </p>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>{% if connection %}Sign in again{% else %}Sign in{% endif %}</h2>
+  {% if twofa_required %}
+  <p class="warning">
+    Two-factor authentication is required. Enter the current code from your Pushover app and
+    submit your password again.
+  </p>
+  {% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/settings/pushover">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label for="pushover-email">Pushover email</label>
+    <input
+      id="pushover-email"
+      name="email"
+      type="email"
+      value="{{ email }}"
+      autocomplete="username"
+      required
+    />
+    <label for="pushover-password">Password</label>
+    <input
+      id="pushover-password"
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      required
+    />
+    {% if twofa_required %}
+    <label for="pushover-twofa">Two-factor code</label>
+    <input
+      id="pushover-twofa"
+      name="twofa"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      required
+    />
+    {% endif %}
+    <button type="submit">{% if connection %}Reconnect{% else %}Sign in and register device{% endif %}</button>
+  </form>
+  <p class="muted">
+    The password and two-factor code are used only for this request and are never stored.
+  </p>
+</section>
+{% endblock %}

@@ -122,6 +122,18 @@ button.link {
   display: inline;
 }
 
+.nav-link {
+  margin-left: auto;
+  margin-right: 1rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .empty {
   color: var(--muted);
   padding: 2rem 0;

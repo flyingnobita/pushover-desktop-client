@@ -1,5 +1,6 @@
 """HTTP routes: auth, history list/detail, filters, and mutations."""
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -15,6 +16,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
+from app.pushover import (
+    PushoverError,
+    PushoverGateway,
+    PushoverSession,
+    TwoFactorRequired,
+    sign_in,
+)
 from app.storage import MESSAGE_ID_RE, CountChanged, Storage, decode_cursor
 
 PACKAGE_DIR = Path(__file__).parent
@@ -93,6 +101,7 @@ def create_router(settings: Settings) -> APIRouter:
     ) -> Response:
         context.setdefault("csrf_token", session["csrf"])
         context.setdefault("auth_enabled", not settings.auth_disabled)
+        context.setdefault("signed_in", bool(session.get("auth")) or settings.auth_disabled)
         result = templates.TemplateResponse(request, template, context, status_code=status_code)
         result.set_cookie(
             COOKIE_NAME,
@@ -122,11 +131,22 @@ def create_router(settings: Settings) -> APIRouter:
     def storage(request: Request) -> Storage:
         return request.app.state.storage
 
+    def pushover_session(request: Request) -> PushoverSession | None:
+        return request.app.state.pushover_store.load()
+
     def receiver_status(request: Request) -> dict[str, Any]:
         state = storage(request).sync_state()
         backend = "Stubbed" if settings.collector_backend == "stub" else "Pushover"
-        if state.status == "never":
-            text = "Collection has not run yet."
+        connected = (
+            settings.collector_backend != "pushover" or pushover_session(request) is not None
+        )
+        if not connected:
+            text = "Pushover receiver: not connected. Sign in from Pushover setup."
+        elif state.status == "never":
+            if settings.collector_backend == "pushover":
+                text = "Pushover receiver: connected, collection has not run yet."
+            else:
+                text = "Collection has not run yet."
         elif state.status == "ok":
             text = f"{backend} receiver: last successful sync {utc_text(state.last_success_at)}."
         else:
@@ -138,6 +158,7 @@ def create_router(settings: Settings) -> APIRouter:
             "backend": backend,
             "text": text,
             "status": state.status,
+            "connected": connected,
             "last_success": utc_text(state.last_success_at),
             "last_attempt": utc_text(state.last_attempt_at),
         }
@@ -407,5 +428,81 @@ def create_router(settings: Settings) -> APIRouter:
                 status_code=409,
             )
         return see_other("/", session)
+
+    # -- Pushover onboarding ------------------------------------------------
+
+    def settings_context(request: Request, **extra: Any) -> dict[str, Any]:
+        return {
+            "request": request,
+            "connection": pushover_session(request),
+            "backend_enabled": settings.collector_backend == "pushover",
+            "email": "",
+            "error": None,
+            "twofa_required": False,
+            "receiver": receiver_status(request),
+            **extra,
+        }
+
+    @router.get("/settings/pushover", response_class=HTMLResponse)
+    def pushover_settings(
+        request: Request, session: Annotated[dict[str, Any], Depends(require_session)]
+    ) -> Response:
+        return respond(request, "settings.html", settings_context(request), session)
+
+    @router.post("/settings/pushover")
+    async def pushover_settings_save(
+        request: Request,
+        csrf_token: Annotated[str, Form()] = "",
+        email: Annotated[str, Form()] = "",
+        password: Annotated[str, Form()] = "",
+        twofa: Annotated[str, Form()] = "",
+    ) -> Response:
+        session = require_session(request)
+        check_csrf(session, csrf_token)
+        if settings.collector_backend != "pushover":
+            raise HTTPException(
+                status_code=400, detail="Pushover collection is not enabled for this run"
+            )
+        email = email.strip()
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="email and password are required")
+        store = request.app.state.pushover_store
+        existing = store.load()
+        try:
+            signed_in = await asyncio.to_thread(
+                sign_in,
+                request.app.state.pushover_transport,
+                email=email,
+                password=password,
+                twofa=twofa.strip() or None,
+                device_id=existing.device_id if existing else None,
+                device_name=existing.device_name if existing else None,
+            )
+        except TwoFactorRequired:
+            return respond(
+                request,
+                "settings.html",
+                settings_context(
+                    request,
+                    email=email,
+                    twofa_required=True,
+                    error="Two-factor authentication is required. Enter the current code.",
+                ),
+                session,
+                status_code=401,
+            )
+        except (PushoverError, RuntimeError) as error:
+            return respond(
+                request,
+                "settings.html",
+                settings_context(request, email=email, error=str(error)),
+                session,
+                status_code=502,
+            )
+        store.save(signed_in)
+        await request.app.state.collector.start(
+            PushoverGateway(signed_in, request.app.state.pushover_transport)
+        )
+        return see_other("/settings/pushover", session)
 
     return router
