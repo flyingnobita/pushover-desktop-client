@@ -9,7 +9,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.collector import Gateway, StubGateway, collect_once, run_collector
+from app.collector import (
+    Gateway,
+    StubGateway,
+    collect_once,
+    default_stub_messages,
+    run_collector,
+)
 from app.config import Settings
 from app.pushover import HttpTransport, PushoverGateway, SessionStore, Transport
 from app.routes import create_router
@@ -60,7 +66,7 @@ def create_app(
         control = CollectorControl(settings, storage)
         app.state.collector = control
         if settings.collector_backend == "stub":
-            await control.start(gateway or StubGateway())
+            await control.start(gateway or StubGateway(default_stub_messages()))
         elif settings.collector_backend == "pushover":
             session = session_store.load()
             if session is not None:

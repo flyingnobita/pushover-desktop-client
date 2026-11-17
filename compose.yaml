@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    image: notification-history:local
+    environment:
+      DATA_DIR: /data
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      AUTH_DISABLED: ${AUTH_DISABLED:-false}
+      COLLECTOR_BACKEND: ${COLLECTOR_BACKEND:-pushover}
+      COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL:-30}
+      PAGE_SIZE: ${PAGE_SIZE:-50}
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8080:8080"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 1.0

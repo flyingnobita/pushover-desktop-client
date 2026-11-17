@@ -1,0 +1,41 @@
+services:
+  app:
+    environment:
+      DATA_DIR: /data
+      ADMIN_PASSWORD: ${QA_ADMIN_PASSWORD:-qa-only}
+      AUTH_DISABLED: "false"
+      COLLECTOR_BACKEND: stub
+    # QA gets its own disposable data directory instead of the production bind mount.
+    volumes: !reset []
+    ports: !reset []
+    tmpfs:
+      - /data
+    restart: "no"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)
+      interval: 2s
+      timeout: 5s
+      start_period: 5s
+      retries: 20
+
+  qa:
+    build:
+      context: .
+      dockerfile: Dockerfile.qa
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      QA_BASE_URL: http://localhost:8080
+      QA_ADMIN_PASSWORD: ${QA_ADMIN_PASSWORD:-qa-only}
+    volumes:
+      - ./tests/test_ui.py:/qa/tests/test_ui.py:ro
+    # Share the app's network namespace: Chromium treats localhost as trustworthy and
+    # does not force an HTTPS upgrade on this LAN-only HTTP service.
+    network_mode: "service:app"
+    restart: "no"
+    mem_limit: 1g

@@ -56,6 +56,36 @@ def map_message(message: Mapping[str, Any]) -> Notification:
     )
 
 
+def default_stub_messages() -> list[dict[str, Any]]:
+    """Deterministic content for preview and QA runs of the stub backend."""
+    return [
+        {
+            "id": "1700000300",
+            "date": 1_700_000_300,
+            "title": "Deploy finished",
+            "message": "Release 1.4.0 is live.",
+            "app": "CI",
+            "priority": 0,
+        },
+        {
+            "id": "1700000200",
+            "date": 1_700_000_200,
+            "title": "Certificate expires soon",
+            "message": "The staging certificate expires in 7 days.",
+            "app": "Monitor",
+            "priority": 1,
+        },
+        {
+            "id": "1700000100",
+            "date": 1_700_000_100,
+            "title": "Disk health warning",
+            "message": "ThinkPad disk reports a failing sector.",
+            "app": "Monitor",
+            "priority": 2,
+        },
+    ]
+
+
 class StubGateway:
     """Deterministic in-memory gateway; confirms by removing from the queue."""
 

@@ -1,0 +1,7 @@
+FROM mcr.microsoft.com/playwright/python:v1.65.2-jammy
+
+WORKDIR /qa
+
+RUN pip install --no-cache-dir playwright==1.65.2 pytest==8.3.3
+
+CMD ["pytest", "-q", "tests/test_ui.py"]
