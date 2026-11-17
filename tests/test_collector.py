@@ -40,6 +40,23 @@ class BrokenStorage:
         return getattr(self._storage, name)
 
 
+class RecordingFaults:
+    """Real storage whose named writes fail, like a full disk."""
+
+    def __init__(self, storage: Storage, *failing: str) -> None:
+        self._storage = storage
+        self._failing = failing
+
+    def __getattr__(self, name: str) -> Any:
+        if name in self._failing:
+
+            def fail(*_args: Any, **_kwargs: Any) -> None:
+                raise RuntimeError("disk full")
+
+            return fail
+        return getattr(self._storage, name)
+
+
 def test_collected_message_becomes_visible_history_and_is_confirmed(
     storage: Storage,
 ) -> None:
@@ -192,3 +209,63 @@ def test_mark_confirmed_failure_is_recorded_and_never_escapes(storage: Storage) 
     # already happened before the receipt write failed.
     assert storage.get("a") is not None
     assert gateway.confirmed == ["a"]
+
+
+def test_full_disk_recording_fault_never_escapes_the_pass(storage: Storage) -> None:
+    """Both the receipt write and the failure record fail: the pass still returns."""
+    gateway = StubGateway([message("a", 100)])
+
+    try:
+        result = collect_once(
+            gateway, RecordingFaults(storage, "mark_confirmed", "record_failure")
+        )
+    except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
+        pytest.fail(f"collect_once raised on a recording fault: {error!r}")
+
+    assert result.ok is False
+    assert "disk full" in (result.error or "")
+    assert storage.get("a") is not None
+    assert gateway.confirmed == ["a"]
+
+
+def test_recording_fault_while_skipping_a_malformed_message_never_escapes(
+    storage: Storage,
+) -> None:
+    gateway = StubGateway([message("bad", 100, priority=9)])
+
+    try:
+        result = collect_once(gateway, RecordingFaults(storage, "record_failure"))
+    except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
+        pytest.fail(f"collect_once raised on a recording fault: {error!r}")
+
+    assert result.ok is False
+    assert "invalid priority: 9" in (result.error or "")
+    assert gateway.confirmed == ["bad"]
+
+
+def test_recording_fault_after_a_clean_pass_keeps_the_success_result(
+    storage: Storage,
+) -> None:
+    gateway = StubGateway([message("a", 100)])
+
+    try:
+        result = collect_once(gateway, RecordingFaults(storage, "record_success"))
+    except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
+        pytest.fail(f"collect_once raised on a recording fault: {error!r}")
+
+    assert result == CollectResult(ok=True, received=1, duplicates=0, confirmed=1, error=None)
+    assert storage.get("a") is not None
+    assert gateway.confirmed == ["a"]
+
+
+def test_fetch_failure_with_a_recording_fault_never_escapes(storage: Storage) -> None:
+    gateway = StubGateway()
+    gateway.fail_fetch = "connection refused"
+
+    try:
+        result = collect_once(gateway, RecordingFaults(storage, "record_failure"))
+    except Exception as error:  # noqa: BLE001 - pre-fix this kills the collector task
+        pytest.fail(f"collect_once raised on a recording fault: {error!r}")
+
+    assert result.ok is False
+    assert "connection refused" in (result.error or "")

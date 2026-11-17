@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -105,6 +106,12 @@ class StubGateway:
             self.confirmed.append(message_id)
 
 
+def _record(call: Callable[[], None]) -> None:
+    """Recording is best effort: a storage fault there must not end the pass."""
+    with suppress(Exception):
+        call()
+
+
 def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
     """Run one collection pass; never confirms a message it failed to persist.
 
@@ -114,7 +121,7 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
     try:
         messages = gateway.fetch_messages()
     except Exception as error:  # noqa: BLE001 - any fetch fault is a recorded outage
-        storage.record_failure(f"fetch failed: {error}")
+        _record(lambda: storage.record_failure(f"fetch failed: {error}"))
         return CollectResult(ok=False, error=f"fetch failed: {error}")
 
     received = duplicates = confirmed = 0
@@ -145,7 +152,7 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
                 # still recorded instead of ending the retry loop.
                 storage.mark_confirmed(notification.pushover_message_id, int(time.time()))
         except Exception as error:  # noqa: BLE001 - surface the fault, confirm nothing
-            storage.record_failure(f"delivery failed: {error}")
+            _record(lambda: storage.record_failure(f"delivery failed: {error}"))
             return CollectResult(
                 ok=False,
                 received=received,
@@ -156,7 +163,7 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
 
     if skipped:
         error = f"skipped {len(skipped)} malformed message(s): {skipped[-1]}"
-        storage.record_failure(error)
+        _record(lambda: storage.record_failure(error))
         return CollectResult(
             ok=False,
             received=received,
@@ -165,7 +172,7 @@ def collect_once(gateway: Gateway, storage: Storage) -> CollectResult:
             error=error,
         )
 
-    storage.record_success()
+    _record(storage.record_success)
     return CollectResult(ok=True, received=received, duplicates=duplicates, confirmed=confirmed)
 
 
