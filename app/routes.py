@@ -180,6 +180,7 @@ def create_router(settings: Settings) -> APIRouter:
 
     def list_url(request: Request, cursor: str | None = None) -> str:
         params = {key: value for key, value in request.query_params.items() if key != "cursor"}
+        cursor = cursor or request.query_params.get("cursor")
         if cursor:
             params["cursor"] = cursor
         query = urlencode(params)

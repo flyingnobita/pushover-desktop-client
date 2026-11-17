@@ -7,6 +7,7 @@ import re
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import parse_qs, unquote_plus, urlsplit
 
 from fastapi.testclient import TestClient
 
@@ -193,6 +194,31 @@ def test_timed_refresh_keeps_the_current_query(settings: Settings) -> None:
     assert "scope=all" in response.text
     assert "q=news" in response.text
     assert "read=unread" in response.text
+
+
+def test_page_two_keeps_the_cursor_in_back_link_refresh_and_next_field(
+    settings: Settings,
+) -> None:
+    with reader(settings) as client:
+        first = client.get("/", params={"scope": "inbox", "limit": 1})
+        older_link = re.search(r'href="(/[^"]*cursor=[^"]*)"', first.text)
+        assert older_link, first.text
+        page_two_url = html.unescape(older_link.group(1))
+        cursor = parse_qs(urlsplit(page_two_url).query)["cursor"][0]
+        page_two = client.get(page_two_url)
+
+    text = page_two.text
+    refresh = re.search(r'http-equiv="refresh" content="\d+;url=([^"]+)"', text)
+    back = re.search(r'href="/messages/[^"?]+\?back=([^"]+)"', text)
+    next_field = re.search(r'<input type="hidden" name="next" value="([^"]+)"', text)
+    assert refresh and back and next_field, text
+    urls = [
+        html.unescape(refresh.group(1)),
+        unquote_plus(html.unescape(back.group(1))),
+        html.unescape(next_field.group(1)),
+    ]
+    for url in urls:
+        assert parse_qs(urlsplit(url).query).get("cursor") == [cursor], url
 
 
 def test_invalid_filters_and_cursors_are_rejected(settings: Settings) -> None:
