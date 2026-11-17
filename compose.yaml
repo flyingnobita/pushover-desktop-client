@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: notification-history:local
+    image: ghcr.io/flyingnobita/pushover-desktop-client:${IMAGE_TAG:-latest}
     environment:
       DATA_DIR: /data
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
