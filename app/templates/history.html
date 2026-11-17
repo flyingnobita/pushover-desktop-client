@@ -1,20 +1,109 @@
 {% extends "base.html" %}
-{% block title %}Inbox{% endblock %}
+{% block title %}{{ filters.scope | capitalize }}{% endblock %}
+{% block head %}
+<meta http-equiv="refresh" content="{{ refresh_seconds }};url={{ refresh_url }}" />
+{% endblock %}
 {% block content %}
 <section class="status" aria-live="polite">
   <p>{{ receiver.text }}</p>
 </section>
-<h1>Inbox</h1>
-{% if items %}
-<ul class="messages">
-  {% for item in items %}
-  <li class="message priority-{{ item.priority }}">
-    <span class="message-title">{{ item.title }}</span>
-    <span class="message-meta">{{ item.source_app }} &middot; {{ item.message_timestamp | utc }}</span>
-  </li>
+
+<nav class="scopes">
+  {% for name in ["inbox", "archived", "all"] %}
+  <a
+    href="/?scope={{ name }}{% if filters.search %}&amp;q={{ filters.search | urlencode }}{% endif %}{% if filters.source %}&amp;source={{ filters.source | urlencode }}{% endif %}{% if filters.read %}&amp;read={{ filters.read }}{% endif %}"
+    class="{% if filters.scope == name %}active{% endif %}"
+    >{{ name | capitalize }}</a
+  >
   {% endfor %}
-</ul>
+</nav>
+
+<form method="get" action="/" class="filters">
+  <input type="hidden" name="scope" value="{{ filters.scope }}" />
+  <label>
+    Search
+    <input name="q" value="{{ filters.search or '' }}" />
+  </label>
+  <label>
+    Source
+    <select name="source">
+      <option value="">All sources</option>
+      {% for source in sources %}
+      <option value="{{ source }}" {% if filters.source == source %}selected{% endif %}>
+        {{ source }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Read status
+    <select name="read">
+      <option value="">Any</option>
+      <option value="unread" {% if filters.read == "unread" %}selected{% endif %}>Unread</option>
+      <option value="read" {% if filters.read == "read" %}selected{% endif %}>Read</option>
+    </select>
+  </label>
+  <button type="submit">Apply</button>
+</form>
+
+{% if items %}
+<form method="post" action="/messages/read" class="messages">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+  <input type="hidden" name="next" value="{{ current_url }}" />
+  <ul>
+    {% for item in items %}
+    <li
+      class="message priority-{{ item.priority }}{% if item.is_read %} read{% endif %}{% if item.is_archived %} archived{% endif %}"
+    >
+      <input
+        type="checkbox"
+        name="ids"
+        value="{{ item.pushover_message_id }}"
+        id="message-{{ item.pushover_message_id }}"
+        aria-label="Select {{ item.title }}"
+      />
+      <a
+        class="message-title"
+        href="/messages/{{ item.pushover_message_id }}?back={{ current_url | urlencode }}"
+        >{{ item.title }}</a
+      >
+      <span class="message-meta">
+        {{ item.source_app }}{% if item.source_app %} &middot; {% endif %}{{ item.message_timestamp |
+        utc }}{% if item.priority == 2 %} &middot; Emergency{% elif item.priority == 1 %} &middot;
+        High priority{% endif %}{% if not item.is_read %} &middot; Unread{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="actions">
+    <button type="submit" formaction="/messages/read">Mark read</button>
+    <button type="submit" formaction="/messages/unread">Mark unread</button>
+    <button type="submit" formaction="/messages/archive">Archive</button>
+    <button type="submit" formaction="/messages/restore">Restore</button>
+    <button type="submit" formaction="/messages/delete" class="danger">Delete</button>
+  </div>
+</form>
 {% else %}
-<p class="empty">No notifications yet.</p>
+<p class="empty">
+  {% if filters.search or filters.source or filters.read %}No notifications match these filters.{%
+  else %}No notifications yet.{% endif %}
+</p>
 {% endif %}
+
+<div class="actions">
+  {% if filters.scope == "inbox" %}
+  <form method="post" action="/messages/archive-all" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="next" value="{{ current_url }}" />
+    <button type="submit">Archive all inbox</button>
+  </form>
+  {% endif %}
+  <a class="button-link danger" href="/history/delete-all?back={{ current_url | urlencode }}"
+    >Delete all history ({{ counts.all }})</a
+  >
+</div>
+
+{% if next_url %}
+<p><a href="{{ next_url }}">Older notifications</a></p>
+{% endif %} {% if cursor %}<p><a href="/?scope={{ filters.scope }}">Newest first</a></p>{% endif %}
 {% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ back_url }}">Back to list</a></p>
+<article class="card priority-{{ item.priority }}{% if item.is_archived %} archived{% endif %}">
+  <h1>{{ item.title }}</h1>
+  <p class="message-meta">
+    {{ item.source_app }}{% if item.source_app %} &middot; {% endif %}{{ item.message_timestamp |
+    utc }} {% if item.priority == 2 %}&middot; Emergency{% elif item.priority == 1 %}&middot; High
+    priority{% endif %} {% if item.is_read %}&middot; Read{% else %}&middot; Unread{% endif %} {% if
+    item.is_archived %}&middot; Archived{% endif %}
+  </p>
+  <p class="message-body">{{ item.body }}</p>
+  {% if item.url %}
+  <p><a href="{{ item.url }}" rel="noreferrer noopener">{{ item.url_title or item.url }}</a></p>
+  {% endif %}
+</article>
+
+<div class="actions">
+  <form method="post" action="{% if item.is_read %}/messages/unread{% else %}/messages/read{% endif %}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="next" value="{{ back_url }}" />
+    <input type="hidden" name="ids" value="{{ item.pushover_message_id }}" />
+    <button type="submit">{% if item.is_read %}Mark unread{% else %}Mark read{% endif %}</button>
+  </form>
+  <form method="post" action="{% if item.is_archived %}/messages/restore{% else %}/messages/archive{% endif %}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="next" value="/messages/{{ item.pushover_message_id }}?back={{ back_url | urlencode }}" />
+    <input type="hidden" name="ids" value="{{ item.pushover_message_id }}" />
+    <button type="submit">{% if item.is_archived %}Restore to inbox{% else %}Archive{% endif %}</button>
+  </form>
+  <form method="post" action="/messages/delete" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="next" value="{{ back_url }}" />
+    <input type="hidden" name="ids" value="{{ item.pushover_message_id }}" />
+    <button type="submit" class="danger">Delete permanently</button>
+  </form>
+</div>
+{% endblock %}

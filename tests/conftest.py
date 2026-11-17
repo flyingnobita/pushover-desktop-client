@@ -51,10 +51,10 @@ def storage(tmp_path: Path):
 
 
 def notification(message_id: str, timestamp: int = 100, **fields) -> Notification:
-    return Notification(
-        pushover_message_id=message_id,
-        title=f"Title {message_id}",
-        body=f"Body {message_id}",
-        message_timestamp=timestamp,
-        **fields,
-    )
+    defaults = {
+        "title": f"Title {message_id}",
+        "body": f"Body {message_id}",
+        "message_timestamp": timestamp,
+    }
+    defaults.update(fields)
+    return Notification(pushover_message_id=message_id, **defaults)

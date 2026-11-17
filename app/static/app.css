@@ -126,3 +126,114 @@ button.link {
   color: var(--muted);
   padding: 2rem 0;
 }
+
+.scopes {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.scopes a {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.scopes a.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.filters label {
+  margin: 0;
+}
+
+.filters input,
+.filters select {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.messages ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.message {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "check title" "check meta";
+  gap: 0 0.6rem;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.message:last-child {
+  border-bottom: none;
+}
+
+.message input[type="checkbox"] {
+  grid-area: check;
+}
+
+.message-title {
+  grid-area: title;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.message.read .message-title {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.message-meta {
+  grid-area: meta;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.priority-2,
+.message.priority-2 {
+  background: var(--emergency);
+}
+
+.message-body {
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.danger {
+  border-color: #a12b1f;
+  color: #a12b1f;
+}
+
+.button-link {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-decoration: none;
+}
