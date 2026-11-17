@@ -5,5 +5,16 @@
   <p>{{ receiver.text }}</p>
 </section>
 <h1>Inbox</h1>
+{% if items %}
+<ul class="messages">
+  {% for item in items %}
+  <li class="message priority-{{ item.priority }}">
+    <span class="message-title">{{ item.title }}</span>
+    <span class="message-meta">{{ item.source_app }} &middot; {{ item.message_timestamp | utc }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
 <p class="empty">No notifications yet.</p>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,147 @@
+"""Collector seam: persist-before-confirm, dedupe, and recorded failures."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+import pytest
+
+from app.collector import CollectResult, StubGateway, collect_once
+from app.storage import Notification, Storage
+
+
+def message(message_id: str = "a", date: int = 100, **fields: Any) -> dict[str, Any]:
+    payload = {
+        "id": message_id,
+        "date": date,
+        "title": f"Title {message_id}",
+        "message": f"Body {message_id}",
+        "app": "TestApp",
+        "priority": 0,
+    }
+    payload.update(fields)
+    return payload
+
+
+class BrokenStorage:
+    """Real storage that fails to write one message, like a full disk."""
+
+    def __init__(self, storage: Storage, fail_id: str) -> None:
+        self._storage = storage
+        self._fail_id = fail_id
+
+    def persist_delivery(self, item: Notification, now: int | None = None) -> str:
+        if item.pushover_message_id == self._fail_id:
+            raise RuntimeError("disk full")
+        return self._storage.persist_delivery(item, now=now)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._storage, name)
+
+
+def test_collected_message_becomes_visible_history_and_is_confirmed(
+    storage: Storage,
+) -> None:
+    gateway = StubGateway([message("a", 100, title="Deploy", priority=2)])
+
+    result = collect_once(gateway, storage)
+
+    assert result == CollectResult(ok=True, received=1, duplicates=0, confirmed=1, error=None)
+    item = storage.get("a")
+    assert (item.title, item.body, item.message_timestamp) == ("Deploy", "Body a", 100)
+    assert (item.priority, item.source_app, item.is_read, item.is_archived) == (
+        2,
+        "TestApp",
+        False,
+        False,
+    )
+    assert gateway.confirmed == ["a"]
+    assert gateway.pending == []
+    assert storage.sync_state().status == "ok"
+    assert storage.receipt("a").confirmed_at is not None
+
+
+def test_failed_write_confirms_nothing(storage: Storage) -> None:
+    gateway = StubGateway([message("bad"), message("good")])
+
+    result = collect_once(gateway, BrokenStorage(storage, fail_id="bad"))
+
+    assert result.ok is False
+    assert result.confirmed == 0
+    assert gateway.confirmed == []
+    assert gateway.pending
+    assert storage.get("good") is None
+    assert "disk full" in (storage.sync_state().last_error or "")
+
+
+def test_second_delivery_preserves_read_and_archive_state(storage: Storage) -> None:
+    first = StubGateway([message("a", 100)])
+    assert collect_once(first, storage).received == 1
+    storage.set_read(["a"], True)
+    storage.archive(["a"])
+
+    redelivery = StubGateway([message("a", 100, title="Changed title")])
+
+    result = collect_once(redelivery, storage)
+
+    assert (result.ok, result.received, result.duplicates) == (True, 0, 1)
+    assert redelivery.confirmed == ["a"]
+    item = storage.get("a")
+    assert (item.title, item.is_read, item.is_archived) == ("Title a", True, True)
+
+
+def test_fetch_failure_records_error_and_keeps_history(storage: Storage) -> None:
+    gateway = StubGateway([message("a", 100)])
+    collect_once(gateway, storage)
+    gateway.fail_fetch = "connection refused"
+
+    result = collect_once(gateway, storage)
+
+    assert result.ok is False
+    assert "connection refused" in (result.error or "")
+    state = storage.sync_state()
+    assert state.status == "error"
+    assert "connection refused" in (state.last_error or "")
+    assert storage.get("a") is not None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"id": "has spaces", "date": 100},
+        {"id": "a", "date": "not-a-number"},
+        {"id": "a", "date": 100, "priority": 9},
+        {"date": 100},
+    ],
+)
+def test_malformed_message_is_rejected_without_confirmation(
+    storage: Storage, payload: Mapping[str, Any]
+) -> None:
+    gateway = StubGateway([payload])
+
+    result = collect_once(gateway, storage)
+
+    assert result.ok is False
+    assert gateway.confirmed == []
+    assert storage.sync_state().status == "error"
+
+
+def test_confirm_failure_leaves_the_message_persisted_for_redelivery(
+    storage: Storage,
+) -> None:
+    class ConfirmFails(StubGateway):
+        def confirm(self, message_ids: Sequence[str]) -> None:
+            raise RuntimeError("connection reset")
+
+    gateway = ConfirmFails([message("a", 100)])
+
+    result = collect_once(gateway, storage)
+
+    assert result.ok is False
+    assert storage.get("a") is not None
+
+    retry = StubGateway([message("a", 100)])
+
+    assert collect_once(retry, storage).duplicates == 1
+    assert retry.confirmed == ["a"]

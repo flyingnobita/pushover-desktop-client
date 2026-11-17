@@ -29,7 +29,12 @@ def login(client: TestClient, password: str = "secret") -> None:
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    return Settings(data_dir=tmp_path / "data", admin_password="secret", auth_disabled=False)
+    return Settings(
+        data_dir=tmp_path / "data",
+        admin_password="secret",
+        auth_disabled=False,
+        collector_backend="off",
+    )
 
 
 @pytest.fixture
