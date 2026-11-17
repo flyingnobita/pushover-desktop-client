@@ -34,6 +34,8 @@ services:
       QA_ADMIN_PASSWORD: ${QA_ADMIN_PASSWORD:-qa-only}
     volumes:
       - ./qa/flow.py:/qa/flow.py:ro
+      - ./qa/screenshots.py:/qa/screenshots.py:ro
+      - ./docs/screenshots:/qa/out
     # Share the app's network namespace: Chromium treats localhost as trustworthy and
     # does not force an HTTPS upgrade on this LAN-only HTTP service.
     network_mode: "service:app"
